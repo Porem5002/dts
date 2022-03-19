@@ -52,6 +52,8 @@ void dynamic_array_raw_init(dynamic_array_t* array, size_t element_size, size_t 
 
 size_t dynamic_array_raw_add(dynamic_array_t* array, void* data_to_add);
 
+size_t dynamic_array_raw_grow(dynamic_array_t* array, size_t growth_factor, void* default_value_data);
+
 void* dynamic_array_raw_element(dynamic_array_t* array, size_t index);
 
 void dynamic_array_free(dynamic_array_t* array);
@@ -61,6 +63,8 @@ void dynamic_array_free(dynamic_array_t* array);
 #define dynamic_array_init(ARRAY, TYPE, ELEMENT_COUNT) dynamic_array_raw_init(ARRAY, sizeof(TYPE), ELEMENT_COUNT)
 
 #define dynamic_array_add(ARRAY, TYPE, DATA) dynamic_array_raw_add(ARRAY, DATA)
+
+#define dynamic_array_grow(ARRAY, TYPE, GROWTH_FACTOR, DATA) dynamic_array_raw_grow(ARRAY, GROWTH_FACTOR, DATA)
 
 #define dynamic_array_element(ARRAY, TYPE, INDEX) (*(TYPE*)(dynamic_array_raw_element(ARRAY, INDEX)))
 

@@ -55,6 +55,18 @@ size_t dynamic_array_raw_add(dynamic_array_t* array, void* data_to_add)
     return array->top_element_index - 1;
 }
 
+size_t dynamic_array_raw_grow(dynamic_array_t* array, size_t growth_factor, void* default_value_data)
+{
+    size_t first_element_added_index = dynamic_array_size(array);
+
+    if(growth_factor == 0) return first_element_added_index;
+
+    for (size_t i = 0; i < growth_factor; i++)
+        dynamic_array_raw_add(array, default_value_data);
+
+    return first_element_added_index;
+}
+
 void* dynamic_array_raw_element(dynamic_array_t* array, size_t index)
 {
     return &array->data[index * array->element_size];   
