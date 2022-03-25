@@ -6,6 +6,10 @@
 
 typedef unsigned char byte;
 
+/****************************************************************
+                            ARRAY
+****************************************************************/
+
 typedef struct ARRAY_STRUCT 
 {
     size_t size;
@@ -14,21 +18,95 @@ typedef struct ARRAY_STRUCT
 
 #define array(TYPE) array_t
 
+/**
+ * Gets the number of elements contained in the given array.
+ * 
+ * \param array array where this operation will be applied
+ *
+ * \return Number of elements of the array
+ */ 
 size_t array_size(array_t* array);
 
+/**
+ * Creates an array and allocates a block big enough to store a given number of elements of a given size.
+ * 
+ * \param element_size size of the element in bytes
+ * \param element_count number of elements
+ * 
+ * \return Array struct corresponding to the desired array
+ */ 
 array_t array_raw_create(size_t element_size, size_t element_count);
 
+/**
+ * Same as array_raw_create, but takes a pointer where the final array will be stored instead of returning an array struct.
+ * 
+ * \param array address where the final array struct will be stored
+ * \param element_size size of the element in bytes
+ * \param element_count number of elements
+ * 
+ * \return Nothing
+ */ 
 void array_raw_init(array_t* array, size_t element_size, size_t element_count);
 
+/**
+ * Gets the address of an element inside the given array, equivalent to &array[index] on a normal c array or pointer.
+ * 
+ * \param array array where this operation will be applied
+ * \param element_size size of the element in bytes
+ * \param index desired element
+ * 
+ * \return Address of the element.
+ */ 
 void* array_raw_element(array_t* array, size_t element_size, size_t index);
 
+/**
+ * Frees the given array's data block.
+ * 
+ * \param array array to free
+ * 
+ * \return Nothing
+ */ 
 void array_free(array_t* array);
 
+/**
+ * Creates an array and allocates a block big enough to store a given number of elements of a given type.
+ * 
+ * \param TYPE type of the element
+ * \param COUNT number of elements
+ * 
+ * \return Array struct corresponding to the desired array
+ */ 
 #define array_create(TYPE, COUNT) array_raw_create(sizeof(TYPE), COUNT)
 
+/**
+ * Same as array_create, but takes a pointer where the final array will be stored instead of returning an array struct.
+ * 
+ * \param ARRAY address where the final array struct will be stored
+ * \param TYPE type of the element
+ * \param COUNT number of elements
+ * 
+ * \return Nothing
+ */ 
 #define array_init(ARRAY, TYPE, COUNT) array_raw_init(ARRAY, sizeof(TYPE), COUNT)
 
+/**
+ * Gets or Sets the value of an element inside the given array, works just like array[index] and array[index] = value, to get and set respectively, to get an expression equivalent to &array[index] use array_raw_element instead.
+ * 
+ * \param ARRAY array where this operation will be applied
+ * \param TYPE type of the element
+ * \param INDEX desired element
+ * 
+ * \return The value or the reference (not address/pointer) of an element.
+ */ 
 #define array_element(ARRAY, TYPE, INDEX) (*(TYPE*)array_raw_element(ARRAY, sizeof(TYPE), INDEX))
+
+/****************************************************************
+                        END ARRAY
+****************************************************************/
+
+/****************************************************************
+                       DYNAMIC ARRAY
+****************************************************************/
 
 typedef struct DYNAMIC_ARRAY_STRUCT
 {
@@ -68,6 +146,14 @@ void dynamic_array_free(dynamic_array_t* array);
 
 #define dynamic_array_element(ARRAY, TYPE, INDEX) (*(TYPE*)(dynamic_array_raw_element(ARRAY, INDEX)))
 
+/****************************************************************
+                       END DYNAMIC ARRAY
+****************************************************************/
+
+/****************************************************************
+                            STACK
+****************************************************************/
+
 typedef struct
 {
     void* top;
@@ -102,6 +188,14 @@ void stack_free(stack_t* stack);
 #define stack_pop(STACK, TYPE) (*(TYPE*)stack_raw_pop(STACK, sizeof(TYPE)))
 
 #define stack_push(STACK, TYPE, DATA) stack_raw_push(STACK, sizeof(TYPE), DATA)
+
+/****************************************************************
+                            END STACK
+****************************************************************/
+
+/****************************************************************
+                            LIST
+****************************************************************/
 
 typedef struct NODE_STRUCT
 {
@@ -140,6 +234,14 @@ void list_free(list_t* list);
 #define list_element_address(LIST, INDEX) (&list_get_node(LIST, INDEX)->data) 
 
 #define list_element(LIST, TYPE, INDEX) (*(TYPE*)(list_element_address(LIST, INDEX)))
+
+/****************************************************************
+                            END_LIST
+****************************************************************/
+
+/****************************************************************
+                            TREE
+****************************************************************/
 
 typedef struct TREE_NODE_STRUCT
 {
@@ -180,9 +282,13 @@ void tree_free(tree_t tree);
 
 #define tree_insert(TREE, TYPE, DATA) tree_raw_insert(TREE, sizeof(TYPE), DATA)
 
-//***********************************************
-//                   CASTING
-//***********************************************
+/****************************************************************
+                            END TREE
+****************************************************************/
+
+/****************************************************************
+                            CASTS
+****************************************************************/
 
 #define cast_array_to_dynamic_array(ARRAY, TYPE)            __internal_cast_array_to_dynamic_array(ARRAY, sizeof(TYPE))
 #define cast_dynamic_array_to_array(DYNAMIC_ARRAY, TYPE)    __internal_cast_dynamic_array_to_array(DYNAMIC_ARRAY)
