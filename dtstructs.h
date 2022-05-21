@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#ifdef __STDC__
+/* Inline only if the standard supports it */
+#ifndef __STDC_VERSION__
 #define DTSDEF_DEFAULT static
 #else
 #define DTSDEF_DEFAULT static inline
