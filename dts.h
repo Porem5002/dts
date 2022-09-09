@@ -2,6 +2,7 @@
 #define DTS_LIB_MAIN_DEFS
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 
 #ifdef DTS_DEBUG_CHECKS
