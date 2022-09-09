@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#ifdef DTS_DEBUG_CHECKS
+#include <stdio.h>
+#include <inttypes.h>
+#endif
+
 /* Inline only if the standard supports it */
 #ifndef __STDC_VERSION__
 #define DTSDEF_DEFAULT static
@@ -42,6 +47,20 @@ DTSDEF size_t array_size(array_t* array)
 
 DTSDEF void array_free(array_t* array)
 {
+    #ifdef DTS_DEBUG_CHECKS
+    if(array == NULL)
+    {
+        fputs("Attempting to free array, but the pointer to the array is null!\n", stdout);
+        exit(1);
+    }
+    if(array_size(array) == 0 && array->data != NULL)
+    {
+        fputs("Attempting to free an invalid array!\n", stdout);
+        printf("More Info:\n\tThe array has no size but a block of data is associated to it (data: %p).\n", array->data);
+        exit(1);
+    }
+    #endif
+
     free(array->data);
     array->data = NULL;
 }
@@ -57,6 +76,15 @@ DTSDEF array_t rrr_array_new(size_t element_count, size_t element_size)
 
 DTSDEF void* rrr_array_ele(array_t* array, size_t element_size, size_t index)
 {
+    #ifdef DTS_DEBUG_CHECKS
+    if(array_size(array) <= index)
+    {
+        fputs("Attempting to access an out of bounds element from an array!\n", stdout);
+        printf("More Info:\n\t(array size: %"PRIu64", element index: %"PRIu64")\n", array_size(array), index);
+        exit(1);
+    }
+    #endif
+
     return &((char*)array->data)[element_size * index];
 }
 
@@ -158,6 +186,15 @@ DTSDEF size_t rrr_dynarray_grow(dynarray_t* array, size_t growth_factor, void* d
 
 DTSDEF void* rrr_dynarray_ele(dynarray_t* array, size_t index)
 {
+    #ifdef DTS_DEBUG_CHECKS
+    if(dynarray_size(array) <= index)
+    {
+        fputs("Attempting to access an out of bounds element from a dynamic array!\n", stdout);
+        printf("More Info:\n\t(dynamic array size: %"PRIu64", element index: %"PRIu64")\n", dynarray_size(array), index);
+        exit(1);
+    }
+    #endif
+
     return &array->data[index * array->element_size];   
 }
 
