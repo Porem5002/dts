@@ -34,9 +34,22 @@ typedef struct ARRAY_STRUCT
 
 #define array(TYPE) array_t
 
+/**
+ *  Represents an empty array of a certain type.
+ *  This should only be used to initialize a variable, for other cases use ARRAY_EMPTY.
+ *  @param TYPE element type of the array
+ */ 
+#define ARRAY_EMPTY_INIT(TYPE) { .size = 0, .data = NULL }
+
+/**
+ *  Represents an empty array of a certain type.
+ *  When initializing a variable, ARRAY_EMPTY_INIT should be used instead.
+ *  @param TYPE element type of the array
+ */ 
+#define ARRAY_EMPTY(TYPE) ((array(TYPE))ARRAY_EMPTY_INIT(TYPE))
+
 // ARRAY: Main Functions
 
-#define array_stk(TYPE, ...) (array_t){ .size = (sizeof((TYPE[]){ __VA_ARGS__ }) / sizeof(TYPE)), .data = (TYPE[]){ __VA_ARGS__ } }
 #define array_stt(SIZE, DATA_PTR) (array_t){ .size = SIZE, .data = DATA_PTR }
 #define array_new(TYPE, COUNT) rrr_array_new(COUNT, sizeof(TYPE))
 #define array_ele(ARRAY, TYPE, INDEX) (*(TYPE*)rrr_array_ele(ARRAY, sizeof(TYPE), INDEX))
@@ -44,6 +57,16 @@ typedef struct ARRAY_STRUCT
 DTSDEF size_t array_size(array_t* array)
 {
     return array->size;
+}
+
+/**
+ *  Used to check if an array is empty (is equal to ARRAY_EMPTY_INIT or ARRAY_EMPTY).
+ *  @param array the array to check
+ *  @return the result of the check
+ */ 
+DTSDEF bool array_is_empty(array_t* array)
+{
+    return array->size == 0 && array->data == NULL;
 }
 
 DTSDEF void array_free(array_t* array)
@@ -63,12 +86,15 @@ DTSDEF void array_free(array_t* array)
     #endif
 
     free(array->data);
-    array->data = NULL;
+    *array = ARRAY_EMPTY(void);
 }
 
 // ARRAY: BACKING Functions
 DTSDEF array_t rrr_array_new(size_t element_count, size_t element_size)
 {
+    if(element_count == 0)
+        return ARRAY_EMPTY(void);
+
     array_t array;
     array.size = element_count;
     array.data = malloc(element_size * element_count);
