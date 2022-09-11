@@ -94,13 +94,13 @@ DTSDEF void array_free(array_t* array)
     if(array == NULL)
     {
         fputs("Attempting to free array, but the pointer to the array is null!\n", stdout);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if(array_size(array) == 0 && array->data != NULL)
     {
         fputs("Attempting to free an invalid array!\n", stdout);
         printf("More Info:\n\tThe array has no size but a block of data is associated to it (data: %p).\n", array->data);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     #endif
 
@@ -135,7 +135,7 @@ DTSDEF void* rrr_array_eleptr(array_t* array, size_t element_size, size_t index)
     {
         fputs("Attempting to access an out of bounds element from an array!\n", stdout);
         printf("More Info:\n\t(array size: %"PRIu64", element index: %"PRIu64")\n", array_size(array), index);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     #endif
 
@@ -245,7 +245,7 @@ DTSDEF void* rrr_dynarray_ele(dynarray_t* array, size_t index)
     {
         fputs("Attempting to access an out of bounds element from a dynamic array!\n", stdout);
         printf("More Info:\n\t(dynamic array size: %"PRIu64", element index: %"PRIu64")\n", dynarray_size(array), index);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     #endif
 
