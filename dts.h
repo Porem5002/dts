@@ -52,7 +52,26 @@ typedef struct ARRAY_STRUCT
 
 #define array_stt(SIZE, DATA_PTR) (array_t){ .size = SIZE, .data = DATA_PTR }
 #define array_new(TYPE, COUNT) rrr_array_new(COUNT, sizeof(TYPE))
-#define array_ele(ARRAY, TYPE, INDEX) (*(TYPE*)rrr_array_ele(ARRAY, sizeof(TYPE), INDEX))
+
+/**
+ * Used to get a pointer to an element of the array.
+ * Performs bounds checking at runtime if DTS_DEBUG_CHECKS is defined.
+ * @param ARRAY (array_t*) the array 
+ * @param TYPE type of the element
+ * @param INDEX (size_t) index of the element
+ * @return the pointer to the element
+ */
+#define array_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)rrr_array_eleptr(ARRAY, sizeof(TYPE), INDEX))
+
+/**
+ * Used to get/set the value of an element of the array.
+ * Equivalent to indexing operator [] on normal C arrays/pointers, but performs bounds checking at runtime if DTS_DEBUG_CHECKS is defined.  
+ * @param ARRAY (array_t*) the array 
+ * @param TYPE type of the element
+ * @param INDEX (size_t) index of the element
+ * @return the value of the element
+ */
+#define array_ele(ARRAY, TYPE, INDEX) (*array_eleptr(ARRAY, TYPE, INDEX))
 
 DTSDEF size_t array_size(array_t* array)
 {
@@ -101,7 +120,15 @@ DTSDEF array_t rrr_array_new(size_t element_count, size_t element_size)
     return array;
 }
 
-DTSDEF void* rrr_array_ele(array_t* array, size_t element_size, size_t index)
+/**
+ * WARNING: This is a raw function, indicated by the 'rrr_' at the beginning of the name of the function, and as such is not meant to be called directly.
+ * You should probably use 'array_eleptr' or 'array_ele' instead, unless you have a good reason to be using this function.
+ * @param array the array 
+ * @param element_size size of each element
+ * @param index index of the element
+ * @return the generic pointer to the element
+ */
+DTSDEF void* rrr_array_eleptr(array_t* array, size_t element_size, size_t index)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(array_size(array) <= index)
@@ -163,7 +190,7 @@ DTSDEF void dynarray_free(dynarray_t* array)
 DTSDEF dynarray_t rrr_dynarray_new(size_t element_size, size_t element_count)
 {
     dynarray_t array;
-    
+
     array.top_element_index = element_count;
     array.element_size = element_size;
 
@@ -233,7 +260,7 @@ DTSDEF void* rrr_dynarray_ele(dynarray_t* array, size_t index)
 typedef struct NODE_STRUCT
 {
     struct NODE_STRUCT* next;
-    char data [0];
+    char data [];
 } lnode_t;
 
 typedef lnode_t* list_t;
@@ -345,7 +372,7 @@ typedef struct TREE_NODE_STRUCT
 {
     struct TREE_NODE_STRUCT** leafs;
     size_t leaf_count;
-    char data [0];
+    char data [];
 } tnode_t;
 
 typedef tnode_t* tree_t;
