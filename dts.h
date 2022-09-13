@@ -173,6 +173,8 @@ typedef struct DYNARRAY_STRUCT
 
 #define dynarray_add(ARRAY, TYPE, DATA) do { size_t last_index = rrr_dynarray_add_empty(ARRAY); dynarray_ele(ARRAY, TYPE, last_index) = (DATA); } while (0)
 
+#define dynarray_remove(ARRAY, TYPE) rrr_dynarray_remove(ARRAY)
+
 #define dynarray_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)(rrr_dynarray_eleptr(ARRAY, INDEX)))
 
 #define dynarray_ele(ARRAY, TYPE, INDEX) (*dynarray_eleptr(ARRAY, TYPE, INDEX))
@@ -227,6 +229,17 @@ DTSDEF size_t rrr_dynarray_add_empty(dynarray_t* array)
     }
 
     return array->size++;
+}
+
+DTSDEF bool rrr_dynarray_remove(dynarray_t* array)
+{
+    if(array->size != 0)
+    {
+        array->size--;
+        return true;
+    }
+
+    return false;
 }
 
 DTSDEF void* rrr_dynarray_eleptr(dynarray_t* array, size_t index)
