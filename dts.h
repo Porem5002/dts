@@ -149,9 +149,9 @@ DTSDEF void* rrr_array_eleptr(array_t* array, size_t element_size, size_t index)
 
 typedef struct DYNARRAY_STRUCT
 {
-    size_t element_count;
+    size_t capacity;
+    size_t size;
     size_t element_size;
-    size_t top_element_index;
     char* data;
 } dynarray_t;
 
@@ -159,83 +159,67 @@ typedef struct DYNARRAY_STRUCT
 
 #define dynarray(TYPE) dynarray_t
 
+#define RRR_DYNARRAY_EMPTY_INIT(ELEMENT_SIZE) { .capacity = 0, .size = 0, .element_size = (size_t)(ELEMENT_SIZE), .data = NULL }
+
+#define RRR_DYNARRAY_EMPTY(ELEMENT_SIZE) ((dynarray_t)RRR_DYNARRAY_EMPTY_INIT(ELEMENT_SIZE))
+
+#define DYNARRAY_EMPTY_INIT(TYPE) RRR_DYNARRAY_EMPTY_INIT(sizeof(TYPE))
+
+#define DYNARRAY_EMPTY(TYPE) ((dynarray(TYPE))DYNARRAY_EMPTY_INIT(TYPE))
+
 // DYNARRAY: Main Functions
 
 #define dynarray_new(TYPE, ELEMENT_COUNT) rrr_dynarray_new(sizeof(TYPE), ELEMENT_COUNT)
 
-#define dynarray_add(ARRAY, TYPE, DATA) rrr_dynarray_add(ARRAY, DATA)
-
-#define dynarray_grow(ARRAY, TYPE, GROWTH_FACTOR, DATA) rrr_dynarray_grow(ARRAY, GROWTH_FACTOR, DATA)
+#define dynarray_add(ARRAY, TYPE, DATA) do { size_t last_index = rrr_dynarray_add_empty(ARRAY); dynarray_ele(ARRAY, TYPE, last_index) = (DATA); } while (0)
 
 #define dynarray_ele(ARRAY, TYPE, INDEX) (*(TYPE*)(rrr_dynarray_ele(ARRAY, INDEX)))
 
-DTSDEF size_t dynarray_allocated_size(dynarray_t* array)
+DTSDEF size_t dynarray_capacity(dynarray_t* array)
 {
-    return array->element_count;
+    return array->capacity;
 }
 
 DTSDEF size_t dynarray_size(dynarray_t* array)
 {
-    return array->top_element_index;
+    return array->size;
 }
 
 DTSDEF void dynarray_free(dynarray_t* array)
 {
     free(array->data);
-    array->data = NULL;  
+    *array = RRR_DYNARRAY_EMPTY(array->element_size);
 }
 
 // DYNARRAY: Backing Functions
 
-DTSDEF dynarray_t rrr_dynarray_new(size_t element_size, size_t element_count)
+DTSDEF dynarray_t rrr_dynarray_new(size_t element_size, size_t initial_capacity)
 {
+    if(initial_capacity == 0)
+        return RRR_DYNARRAY_EMPTY(element_size);
+
     dynarray_t array;
-
-    array.top_element_index = element_count;
+    array.capacity = initial_capacity;
     array.element_size = element_size;
-
-    if(element_count != 0)
-        array.element_count = (DYNARRAY_DEFAULT_ELEMENT_COUNT - element_count % DYNARRAY_DEFAULT_ELEMENT_COUNT) + element_count;
-    else
-        array.element_count = DYNARRAY_DEFAULT_ELEMENT_COUNT;
-
-    array.data = malloc(array.element_size * array.element_count);
-
+    array.size = 0;
+    array.data = malloc(array.element_size * array.capacity);
     return array;
 }
 
-DTSDEF size_t rrr_dynarray_add(dynarray_t* array, void* data_to_add)
+DTSDEF size_t rrr_dynarray_add_empty(dynarray_t* array)
 {
-    char* new_element;
-
-    if(array->element_count <= array->top_element_index)
+    if(array->capacity == 0)
     {
-        array->element_count *= 2;
-        array->data = realloc(array->data, array->element_size * array->element_count);
+        array->capacity = DYNARRAY_DEFAULT_ELEMENT_COUNT;
+        array->data = malloc(array->element_size * array->capacity);
+    }
+    else if(array->capacity <= array->size)
+    {
+        array->capacity *= 2;
+        array->data = realloc(array->data, array->element_size * array->capacity);
     }
 
-    new_element = &array->data[array->top_element_index * array->element_size]; 
-
-    if(data_to_add != NULL)
-    {
-        memcpy(new_element, data_to_add, array->element_size);
-    }
-
-    array->top_element_index++;
-
-    return array->top_element_index - 1;
-}
-
-DTSDEF size_t rrr_dynarray_grow(dynarray_t* array, size_t growth_factor, void* default_value_data)
-{
-    size_t first_element_added_index = dynarray_size(array);
-
-    if(growth_factor == 0) return first_element_added_index;
-
-    for (size_t i = 0; i < growth_factor; i++)
-        rrr_dynarray_add(array, default_value_data);
-
-    return first_element_added_index;
+    return array->size++;
 }
 
 DTSDEF void* rrr_dynarray_ele(dynarray_t* array, size_t index)
@@ -480,15 +464,15 @@ DTSDEF tree_t rrr_tree_insert(tree_t tree, size_t data_size, void* data)
 #if !defined(DTS_LIB_CAST_ARRAY_DYNARRAY_DEFS) && defined(DTS_USE_DYNARRAY) && defined(DTS_USE_ARRAY)
 #define DTS_LIB_CAST_ARRAY_DYNARRAY_DEFS
 
-#define array_to_dynarray(ARRAY, TYPE)            rrr_array_to_dynarray(ARRAY, sizeof(TYPE))
-#define dynarray_to_array(DYNAMIC_ARRAY, TYPE)    rrr_dynarray_to_array(DYNAMIC_ARRAY)
+#define array_to_dynarray(ARRAY, TYPE)      rrr_array_to_dynarray(ARRAY, sizeof(TYPE))
+#define dynarray_to_array(DYNARRAY, TYPE)   rrr_dynarray_to_array(DYNARRAY)
 
 DTSDEF dynarray_t rrr_array_to_dynarray(array_t* array, size_t data_size)
 {
     dynarray_t dynarray;
-    dynarray.element_count = array->size;
+    dynarray.capacity = array->size;
     dynarray.element_size = data_size;
-    dynarray.top_element_index = array->size;
+    dynarray.size = array->size;
     dynarray.data = array->data;
     return dynarray;
 }
@@ -496,8 +480,8 @@ DTSDEF dynarray_t rrr_array_to_dynarray(array_t* array, size_t data_size)
 DTSDEF array_t rrr_dynarray_to_array(dynarray_t* dynarray)
 {
     array_t array;
-    array.size = dynarray->top_element_index;
-    array.data = realloc(dynarray->data, array.size * dynarray->element_size);
+    array.size = dynarray->size;
+    array.data = realloc(dynarray->data, dynarray->size * dynarray->element_size);
     return array;
 }
 
