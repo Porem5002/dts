@@ -21,6 +21,21 @@
 #define DTSDEF DTSDEF_DEFAULT
 #endif
 
+#ifdef _WIN32
+#define dts_PRIzu "Iu"
+#else
+#define dts_PRIzu "zu"
+#endif
+
+#if !defined(__STDC_VERSION__) || (__STDC_VERSION__ == 199901L)
+#define dts_alignof(TYPE) (size_t)(sizeof(struct { char a; TYPE b; }) - sizeof(TYPE))
+#else
+#define dts_alignof(TYPE) _Alignof(TYPE)
+#endif
+
+#define dts_align_size(SIZE, ALIGNMENT) ((SIZE) <= (ALIGNMENT) ? (ALIGNMENT) : ((SIZE) + ((SIZE) % (ALIGNMENT))))
+#define dts_align_sizeof(TYPE, ALIGNMENT) dts_align_size(sizeof(TYPE), ALIGNMENT)
+
 #endif
 
 #if !defined(DTS_LIB_ARRAY_DEFS) && defined(DTS_USE_ARRAY)
@@ -134,7 +149,7 @@ DTSDEF void* rrr_array_eleptr(array_t* array, size_t element_size, size_t index)
     if(array_size(array) <= index)
     {
         fputs("Attempting to access an out of bounds element from an array!\n", stdout);
-        printf("More Info:\n\t(array size: %"PRIu64", element index: %"PRIu64")\n", array_size(array), index);
+        printf("More Info:\n\t(array size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", array_size(array), index);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -248,7 +263,7 @@ DTSDEF void* rrr_dynarray_eleptr(dynarray_t* array, size_t index)
     if(dynarray_size(array) <= index)
     {
         fputs("Attempting to access an out of bounds element from a dynamic array!\n", stdout);
-        printf("More Info:\n\t(dynamic array size: %"PRIu64", element index: %"PRIu64")\n", dynarray_size(array), index);
+        printf("More Info:\n\t(dynamic array size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", dynarray_size(array), index);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -261,110 +276,162 @@ DTSDEF void* rrr_dynarray_eleptr(dynarray_t* array, size_t index)
 #if !defined(DTS_LIB_LIST_DEFS) && defined(DTS_USE_LIST)
 #define DTS_LIB_LIST_DEFS
 
-typedef struct NODE_STRUCT
+typedef struct listnode_t
 {
-    struct NODE_STRUCT* next;
-    char data [];
-} lnode_t;
+    struct listnode_t* next;
+    char rest [];
+} listnode_t;
 
-typedef lnode_t* list_t;
+#define listnode(TYPE) listnode_t
 
+#define rrr_listnode_value_offset(ALIGNOF_TYPE)        dts_align_sizeof(listnode_t*, ALIGNOF_TYPE)
+#define rrr_listnode_size(SIZEOF_TYPE, ALIGNOF_TYPE)   (dts_align_sizeof(listnode_t*, ALIGNOF_TYPE) + dts_align_size(SIZEOF_TYPE, dts_alignof(listnode_t*)))
+
+#define listnode_value_offset(TYPE)    rrr_listnode_value_offset(dts_alignof(TYPE))
+#define listnode_size(TYPE)            rrr_listnode_size(sizeof(TYPE), dts_alignof(TYPE))
+
+#define listnode_new(TYPE, NEXT)   rrr_listnode_new(sizeof(TYPE), dts_alignof(TYPE), NEXT)
+#define listnode_next(NODE)         ((NODE)->next)
+
+#define listnode_valueptr(NODE, TYPE)   ((TYPE*)rrr_listnode_valueptr(NODE, dts_alignof(TYPE)))
+#define listnode_value(NODE, TYPE)      (*listnode_valueptr(NODE, TYPE))
+
+#define listnode_free(NODE)        rrr_listnode_free(NODE)
+
+DTSDEF void listnode_free(listnode_t* node)
+{
+    free(node);
+}
+
+DTSDEF listnode_t* rrr_listnode_new(size_t sizeof_type, size_t alignof_type, listnode_t* next)
+{
+    listnode_t* l = malloc(rrr_listnode_size(sizeof_type, alignof_type));
+    l->next = next; 
+    return l;
+}
+
+DTSDEF void* rrr_listnode_valueptr(listnode_t* node, size_t alignof_type)
+{
+    return ((char*)node) + rrr_listnode_value_offset(alignof_type);
+}
+
+typedef listnode_t* list_t;
 #define list(TYPE) list_t
-#define EMPTY_LIST NULL
 
-// LIST: MAIN FUNCTIONS
+#define list_eleptr(LIST, TYPE, INDEX)  ((TYPE*)rrr_list_eleptr(LIST, dts_alignof(TYPE), INDEX))
 
-#define node_new(TYPE, DATA)    rrr_node_new(sizeof(TYPE), DATA)
-#define node_new_empty(TYPE)    rrr_node_new(sizeof(TYPE), NULL)
+#define list_ele(LIST, TYPE, INDEX)     (*list_eleptr(LIST, dts_alignof(TYPE), INDEX))
 
-#define list_append(LIST, TYPE, DATA)           rrr_list_append(LIST, sizeof(TYPE), DATA)
-#define list_insert(LIST, TYPE, DATA, INDEX)    rrr_list_insert(LIST, sizeof(TYPE), DATA, INDEX)
-#define list_eleptr(LIST, INDEX)                (&list_get_node(LIST, INDEX)->data) 
-#define list_ele(LIST, TYPE, INDEX)             (*(TYPE*)(list_eleptr(LIST, INDEX)))
+#define list_insert_first(LIST, TYPE, VALUE) \
+    do { \
+        listnode_t* __new_node = listnode_new(TYPE, LIST); \
+        listnode_value(__new_node, TYPE) = VALUE; \
+        LIST = __new_node; \
+    } while(0)
 
-DTSDEF size_t list_size(list_t* list)
+#define list_insert_at(LIST, TYPE, INDEX, VALUE) \
+    do { \
+        listnode_t* __new_node = listnode_new(TYPE, NULL); \
+        listnode_value(__new_node, TYPE) = VALUE; \
+        if(INDEX == 0) { \
+            __new_node->next = LIST; \
+            LIST = __new_node; \
+        } else { \
+            listnode_t* __prev_node = list_ele_node(LIST, (INDEX)-1); \
+            __new_node->next = __prev_node->next; \
+            __prev_node->next = __new_node; \
+        } \
+    } while(0)
+
+#define list_insert_last(LIST, TYPE, VALUE) \
+    do { \
+        listnode_t* __new_node = listnode_new(TYPE, NULL); \
+        listnode_value(__new_node, TYPE) = VALUE; \
+        \
+        if(LIST != NULL) \
+            list_last_node(LIST)->next = __new_node; \
+        else \
+            LIST = __new_node; \
+    } while(0)
+
+DTSDEF size_t list_size(list_t list)
 {
-    lnode_t* last_node = *list;
     size_t size = 0;
 
-    while (last_node != NULL) 
+    while(list != NULL)
     {
-        last_node = last_node->next;
         size++;
+        list = list->next;
     }
 
     return size;
 }
 
-DTSDEF lnode_t* list_get_node(list_t* list, size_t index)
+DTSDEF listnode_t* list_first_node(list_t list)
 {
-    lnode_t* node = *list;
+    return list;
+}
 
-    if(node == NULL) return NULL;
+DTSDEF listnode_t* list_ele_node(list_t list, size_t index)
+{
+    #ifdef DTS_DEBUG_CHECKS
+    if(list_size(list) <= index)
+    {
+        fputs("Attempting to access an out of bounds element from a list!\n", stdout);
+        printf("More Info:\n\t(list size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", list_size(list), index);
+        exit(EXIT_FAILURE);
+    }
+    #endif
+
+    listnode_t* node = list;
 
     for (size_t i = 0; i < index; i++)
-    {
-        if(node->next == NULL) return NULL;
-
         node = node->next;
-    }
-    
+
     return node;
 }
 
-DTSDEF void list_free(list_t* list)
+DTSDEF listnode_t* list_last_node(list_t l)
 {
-    lnode_t* current_node = *list;
+    if(l == NULL) return NULL;
 
-    while (current_node != NULL) 
-    {
-        lnode_t* next_node = current_node->next;
+    listnode_t* last = l;
 
-        free(current_node);
+    while(last->next != NULL)
+        last = last->next;
 
-        current_node = next_node;
-    }
+    return last;
 }
 
-// LIST: BACKING FUNCTIONS
-
-DTSDEF lnode_t* rrr_node_new(size_t data_size, void* data)
+DTSDEF list_t list_free(list_t l)
 {
-    lnode_t* node = malloc(sizeof(lnode_t) + data_size);
-    node->next = NULL;
-    
-    if(data != NULL) memcpy((void*)node->data, data, data_size);
-    
-    return node;
+    while(l != NULL)
+    {
+        list_t next = l->next;
+        free(l);
+        l = next;
+    }
+
+    return NULL;
 }
 
-DTSDEF void rrr_list_append(list_t* list, size_t data_size, void* data)
+DTSDEF void* rrr_list_eleptr(list_t l, size_t alignof_type, size_t index)
 {
-    lnode_t** next_of_last = list;
-
-    while (*next_of_last != NULL)
+    #ifdef DTS_DEBUG_CHECKS
+    if(list_size(l) <= index)
     {
-        next_of_last = &((*next_of_last)->next);
+        fputs("Attempting to access an out of bounds element from a list!\n", stdout);
+        printf("More Info:\n\t(list size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", list_size(l), index);
+        exit(EXIT_FAILURE);
     }
+    #endif
 
-    *next_of_last = rrr_node_new(data_size, data);
-}
+    list_t current_list = l;
 
-DTSDEF void rrr_list_insert(list_t* list, size_t data_size, void* data, size_t index)
-{
-    lnode_t* new_node = rrr_node_new(data_size, data);
+    for(size_t i = 0; i < index; i++)
+        current_list = current_list->next;
 
-    if(index == 0)
-    {
-        new_node->next = *list;
-        *list = new_node;
-    }
-    else
-    {
-        lnode_t* prev_node = list_get_node(list, index - 1);
-        new_node->next = prev_node->next;
-        prev_node->next = new_node;
-    }
+    return rrr_listnode_valueptr(current_list, alignof_type);
 }
 
 #endif
