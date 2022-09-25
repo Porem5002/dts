@@ -186,7 +186,7 @@ typedef struct DYNARRAY_STRUCT
 
 #define dynarray_new(TYPE, ELEMENT_COUNT) rrr_dynarray_new(sizeof(TYPE), ELEMENT_COUNT)
 
-#define dynarray_add(ARRAY, TYPE, DATA) do { size_t last_index = rrr_dynarray_add_empty(ARRAY); dynarray_ele(ARRAY, TYPE, last_index) = (DATA); } while (0)
+#define dynarray_add(ARRAY, TYPE, ...) do { size_t last_index = rrr_dynarray_add_empty(ARRAY); dynarray_ele(ARRAY, TYPE, last_index) = (__VA_ARGS__); } while (0)
 
 #define dynarray_remove(ARRAY, TYPE) rrr_dynarray_remove(ARRAY)
 
