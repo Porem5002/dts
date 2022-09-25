@@ -296,8 +296,6 @@ typedef struct listnode_t
 #define listnode_valueptr(NODE, TYPE)   ((TYPE*)rrr_listnode_valueptr(NODE, dts_alignof(TYPE)))
 #define listnode_value(NODE, TYPE)      (*listnode_valueptr(NODE, TYPE))
 
-#define listnode_free(NODE)        rrr_listnode_free(NODE)
-
 DTSDEF void listnode_free(listnode_t* node)
 {
     free(node);
@@ -320,7 +318,7 @@ typedef listnode_t* list_t;
 
 #define list_eleptr(LIST, TYPE, INDEX)  ((TYPE*)rrr_list_eleptr(LIST, dts_alignof(TYPE), INDEX))
 
-#define list_ele(LIST, TYPE, INDEX)     (*list_eleptr(LIST, dts_alignof(TYPE), INDEX))
+#define list_ele(LIST, TYPE, INDEX)     (*list_eleptr(LIST, TYPE, INDEX))
 
 #define list_insert_first(LIST, TYPE, VALUE) \
     do { \
