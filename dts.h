@@ -273,6 +273,172 @@ DTSDEF void* rrr_dynarray_eleptr(dynarray_t* array, size_t index)
 
 #endif
 
+#if !defined(DTS_LIB_BUKARRAY_DEFS) && defined(DTS_USE_BUKARRAY)
+#define DTS_LIB_BUKARRAY_DEFS
+
+#define DTS_ELEMENTS_PER_BUCKET ((size_t)512)
+
+typedef struct buk_t
+{
+    struct buk_t* next;
+    // manual alignment on allocation
+    // manual data size on allocation
+} buk_t;
+
+#define rrr_buk_value_offset(ALIGNOF_TYPE) (dts_align_sizeof(buk_t*, ALIGNOF_TYPE))
+#define rrr_buk_size(SIZEOF_TYPE, ALIGNOF_TYPE) (rrr_buk_value_offset(ALIGNOF_TYPE) + dts_align_size((SIZEOF_TYPE) * DTS_ELEMENTS_PER_BUCKET, dts_alignof(buk_t*)))
+
+#define buk_value_offset(TYPE) (rrr_buk_value_offset(dts_alignof(TYPE)))
+#define buk_size(TYPE) (rrr_buk_size(sizeof(TYPE), dts_alignof(TYPE)))
+
+typedef struct BUKARRAY_STRUCT
+{
+    size_t bucket_amount;
+    size_t size;
+    buk_t* first_buk;
+} bukarray_t;
+
+#define bukarray(TYPE) bukarray_t
+
+#define BUKARRAY_EMPTY_INIT(TYPE) { .bucket_amount = 0, .size = 0, .first_buk = NULL }
+
+#define BUKARRAY_EMPTY(TYPE) ((bukarray_t)BUKARRAY_EMPTY_INIT(TYPE))
+
+#define bukarray_new(TYPE, INIT_CAPACITY) rrr_bukarray_new(sizeof(TYPE), dts_alignof(TYPE), INIT_CAPACITY)
+
+#define bukarray_add(ARRAY, TYPE, ...) do { TYPE* last_elem = rrr_bukarray_add_empty(ARRAY, sizeof(TYPE), dts_alignof(TYPE)); *last_elem = (__VA_ARGS__); } while (0)
+
+#define bukarray_remove(ARRAY, TYPE) rrr_bukarray_remove(ARRAY)
+
+#define bukarray_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)rrr_bukarray_eleptr(ARRAY, INDEX, sizeof(TYPE), dts_alignof(TYPE)))
+
+#define bukarray_ele(ARRAY, TYPE, INDEX) (*bukarray_eleptr(ARRAY, TYPE, INDEX))
+
+DTSDEF size_t bukarray_bucket_amount(bukarray_t* array)
+{
+    return array->bucket_amount;
+}
+
+DTSDEF size_t bukarray_capacity(bukarray_t* array)
+{
+    return array->bucket_amount * DTS_ELEMENTS_PER_BUCKET;
+}
+
+DTSDEF size_t bukarray_size(bukarray_t* array)
+{
+    return array->size;
+}
+
+DTSDEF bool bukarray_is_empty(bukarray_t* array)
+{
+    return array->bucket_amount == 0 && array->size == 0 && array->first_buk == NULL;
+}
+
+DTSDEF void bukarray_free(bukarray_t* array)
+{
+    buk_t* current_buk = array->first_buk; 
+
+    while(current_buk != NULL)
+    {
+        buk_t* next_buk = current_buk->next;
+        free(current_buk);
+        current_buk = next_buk;
+    }
+
+    *array = BUKARRAY_EMPTY();
+}
+
+DTSDEF bukarray_t rrr_bukarray_new(size_t sizeof_type, size_t alignof_type, size_t initial_capacity)
+{
+    if(initial_capacity == 0)
+        return BUKARRAY_EMPTY();
+
+    bukarray_t array;
+    array.bucket_amount = (initial_capacity - 1) / DTS_ELEMENTS_PER_BUCKET + 1;
+    array.size = 0;
+    array.first_buk = malloc(rrr_buk_size(sizeof_type, alignof_type));
+
+    buk_t* current_buk = array.first_buk;
+
+    for (size_t i = 0; i < bukarray_bucket_amount(&array) - 1; i++)
+    {
+        current_buk->next = malloc(rrr_buk_size(sizeof_type, alignof_type));
+        current_buk = current_buk->next;
+    }
+
+    current_buk->next = NULL;
+    
+    return array;
+}
+
+DTSDEF void* rrr_bukarray_eleptr(bukarray_t* array, size_t index, size_t sizeof_type, size_t alignof_type)
+{
+    #ifdef DTS_DEBUG_CHECKS
+    if(bukarray_size(array) <= index)
+    {
+        fputs("Attempting to access an out of bounds element from a bucket array!\n", stdout);
+        printf("More Info:\n\t(bucket array size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", bukarray_size(array), index);
+        exit(EXIT_FAILURE);
+    }
+    #endif
+
+    size_t bucket_index = index / DTS_ELEMENTS_PER_BUCKET;
+    size_t internal_index = index % DTS_ELEMENTS_PER_BUCKET;
+
+    buk_t* target_bucket = array->first_buk;
+
+    for (size_t i = 0; i < bucket_index; i++)
+        target_bucket = target_bucket->next;
+
+    return ((char*)target_bucket) + rrr_buk_value_offset(alignof_type) + (internal_index * sizeof_type);
+}
+
+DTSDEF void* rrr_bukarray_add_empty(bukarray_t* array, size_t sizeof_type, size_t alignof_type)
+{
+    size_t new_index = bukarray_size(array);
+
+    array->size++;
+
+    if(new_index >= bukarray_capacity(array))
+    {
+        array->bucket_amount++;
+
+        buk_t* new_buk = malloc(rrr_buk_size(sizeof_type, alignof_type));
+        new_buk->next = NULL;
+
+        if(bukarray_bucket_amount(array) == 1)
+        {
+            array->first_buk = new_buk;
+        }
+        else
+        {    
+            buk_t* last_buk = array->first_buk;
+
+            for (size_t i = 0; i < bukarray_bucket_amount(array) - 2; i++)
+                last_buk = last_buk->next;
+
+            last_buk->next = new_buk;
+        }
+
+        return ((char*)new_buk) + rrr_buk_value_offset(alignof_type);
+    }
+
+    return rrr_bukarray_eleptr(array, new_index, sizeof_type, alignof_type);
+}
+
+DTSDEF bool rrr_bukarray_remove(bukarray_t* array)
+{
+    if(bukarray_size(array) != 0)
+    {
+        array->size--;
+        return true;
+    }
+
+    return false;
+}
+
+#endif
+
 #if !defined(DTS_LIB_LIST_DEFS) && defined(DTS_USE_LIST)
 #define DTS_LIB_LIST_DEFS
 
