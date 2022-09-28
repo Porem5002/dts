@@ -8,7 +8,7 @@ At the moment there is no type checking applied to the internal types of the dat
 
 The library currently supports:
 - arrays
-- dynamic arrays
+- dynamic arrays (dynarray & bukarray)
 - linked lists
 - trees
 
@@ -26,6 +26,7 @@ These are the flags:
 DTS_DEBUG_CHECKS  // Enable debug checks like bounds checking
 DTS_USE_ARRAY     // array
 DTS_USE_DYNARRAY  // dynarray (dynamic array)
+DTS_USE_BUKARRAY  // bukarray (dynamic array)
 DTS_USE_LIST      // list (linked list)
 DTS_USE_TREE      // tree
 ```
@@ -34,6 +35,27 @@ For example if we want to use arrays and lists, we do something like this:
 #define DTS_USE_ARRAY
 #define DTS_USE_LIST
 #include "dts.h"
+```
+
+But if you want to make sure everything is working correctly or run any of the examples provided, you can use [CMake](https://cmake.org/) to build the examples and the tests.
+
+**To do so, follow the following steps:**
+
+Create a new directory called 'build', inside this project's directory
+```Bash
+mkdir build
+cd build
+```
+Then run the following commands inside that new directory, replacing **(generator of choice)** with the specific generator that better suits your development environment (**"Unix Makefiles"**, **"Visual Studio 17"**, etc...)
+```Bash
+cmake .. -G (generator of choice)
+cmake --build .
+```
+After this the examples and tests will be built and their executable binaries will be placed in 'build'.
+
+Finally you can run the tests using **ctest**, while inside the 'build' directory:
+```Bash
+ctest
 ```
 
 ## License
