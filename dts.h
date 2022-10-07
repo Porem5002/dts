@@ -8,6 +8,9 @@
 #ifdef DTS_DEBUG_CHECKS
 #include <stdio.h>
 #include <inttypes.h>
+#define dts_debug_only(...) __VA_ARGS__
+#else
+#define dts_debug_only(...)
 #endif
 
 /* Inline only if the standard supports it */
@@ -76,7 +79,7 @@ typedef struct ARRAY_STRUCT
  * @param INDEX (size_t) index of the element
  * @return the pointer to the element
  */
-#define array_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)rrr_array_eleptr(ARRAY, sizeof(TYPE), INDEX))
+#define array_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)rrr_array_eleptr(dts_debug_only(__FILE__, __LINE__,) ARRAY, sizeof(TYPE), INDEX))
 
 /**
  * Used to get/set the value of an element of the array.
@@ -87,6 +90,8 @@ typedef struct ARRAY_STRUCT
  * @return the value of the element
  */
 #define array_ele(ARRAY, TYPE, INDEX) (*array_eleptr(ARRAY, TYPE, INDEX))
+
+#define array_free(ARRAY) rrr_array_free(dts_debug_only(__FILE__, __LINE__,) ARRAY)
 
 DTSDEF size_t array_size(array_t* array)
 {
@@ -103,18 +108,20 @@ DTSDEF bool array_is_empty(array_t* array)
     return array->size == 0 && array->data == NULL;
 }
 
-DTSDEF void array_free(array_t* array)
+// ARRAY: Raw functions
+
+DTSDEF void rrr_array_free(dts_debug_only(const char* file, int line,) array_t* array)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(array == NULL)
     {
-        fputs("Attempting to free array, but the pointer to the array is null!\n", stdout);
+        fprintf(stdout, "%s:%d: Attempting to free array, but the pointer to the array is null!\n", file, line);
         exit(EXIT_FAILURE);
     }
     if(array_size(array) == 0 && array->data != NULL)
     {
-        fputs("Attempting to free an invalid array!\n", stdout);
-        printf("More Info:\n\tThe array has no size but a block of data is associated to it (data: %p).\n", array->data);
+        fprintf(stdout, "%s:%d: Attempting to free an invalid array!\n", file, line);
+        printf(" The array has no size but a block of data is associated to it (data: %p).\n", array->data);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -123,7 +130,6 @@ DTSDEF void array_free(array_t* array)
     *array = ARRAY_EMPTY(void);
 }
 
-// ARRAY: BACKING Functions
 DTSDEF array_t rrr_array_new(size_t element_count, size_t element_size)
 {
     if(element_count == 0)
@@ -135,21 +141,13 @@ DTSDEF array_t rrr_array_new(size_t element_count, size_t element_size)
     return array;
 }
 
-/**
- * WARNING: This is a raw function, indicated by the 'rrr_' at the beginning of the name of the function, and as such is not meant to be called directly.
- * You should probably use 'array_eleptr' or 'array_ele' instead, unless you have a good reason to be using this function.
- * @param array the array 
- * @param element_size size of each element
- * @param index index of the element
- * @return the generic pointer to the element
- */
-DTSDEF void* rrr_array_eleptr(array_t* array, size_t element_size, size_t index)
+DTSDEF void* rrr_array_eleptr(dts_debug_only(const char* file, int line,) array_t* array, size_t element_size, size_t index)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(array_size(array) <= index)
     {
-        fputs("Attempting to access an out of bounds element from an array!\n", stdout);
-        printf("More Info:\n\t(array size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", array_size(array), index);
+        fprintf(stdout, "ERROR in %s:%d: Out of bounds access of an array element!\n", file, line);
+        printf(" (array size: %"dts_PRIzu", accessed index: %"dts_PRIzu")\n", array_size(array), index);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -190,7 +188,7 @@ typedef struct DYNARRAY_STRUCT
 
 #define dynarray_remove(ARRAY, TYPE) rrr_dynarray_remove(ARRAY)
 
-#define dynarray_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)(rrr_dynarray_eleptr(ARRAY, INDEX)))
+#define dynarray_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)(rrr_dynarray_eleptr(dts_debug_only(__FILE__, __LINE__,) ARRAY, INDEX)))
 
 #define dynarray_ele(ARRAY, TYPE, INDEX) (*dynarray_eleptr(ARRAY, TYPE, INDEX))
 
@@ -257,13 +255,13 @@ DTSDEF bool rrr_dynarray_remove(dynarray_t* array)
     return false;
 }
 
-DTSDEF void* rrr_dynarray_eleptr(dynarray_t* array, size_t index)
+DTSDEF void* rrr_dynarray_eleptr(dts_debug_only(const char* file, int line,) dynarray_t* array, size_t index)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(dynarray_size(array) <= index)
     {
-        fputs("Attempting to access an out of bounds element from a dynamic array!\n", stdout);
-        printf("More Info:\n\t(dynamic array size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", dynarray_size(array), index);
+        fprintf(stdout, "ERROR in %s:%d: Out of bounds access of a dynarray element!\n", file, line);
+        printf(" (dynarray size: %"dts_PRIzu", accessed index: %"dts_PRIzu")\n", dynarray_size(array), index);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -310,7 +308,7 @@ typedef struct BUKARRAY_STRUCT
 
 #define bukarray_remove(ARRAY, TYPE) rrr_bukarray_remove(ARRAY)
 
-#define bukarray_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)rrr_bukarray_eleptr(ARRAY, INDEX, sizeof(TYPE), dts_alignof(TYPE)))
+#define bukarray_eleptr(ARRAY, TYPE, INDEX) ((TYPE*)rrr_bukarray_eleptr(dts_debug_only(__FILE__, __LINE__,) ARRAY, INDEX, sizeof(TYPE), dts_alignof(TYPE)))
 
 #define bukarray_ele(ARRAY, TYPE, INDEX) (*bukarray_eleptr(ARRAY, TYPE, INDEX))
 
@@ -371,13 +369,13 @@ DTSDEF bukarray_t rrr_bukarray_new(size_t sizeof_type, size_t alignof_type, size
     return array;
 }
 
-DTSDEF void* rrr_bukarray_eleptr(bukarray_t* array, size_t index, size_t sizeof_type, size_t alignof_type)
+DTSDEF void* rrr_bukarray_eleptr(dts_debug_only(const char* file, int line,) bukarray_t* array, size_t index, size_t sizeof_type, size_t alignof_type)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(bukarray_size(array) <= index)
     {
-        fputs("Attempting to access an out of bounds element from a bucket array!\n", stdout);
-        printf("More Info:\n\t(bucket array size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", bukarray_size(array), index);
+        fprintf(stdout, "ERROR in %s:%d: Out of bounds access of a bukarray element!\n", file, line);
+        printf(" (bukarray size: %"dts_PRIzu", accessed index: %"dts_PRIzu")\n", bukarray_size(array), index);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -423,7 +421,7 @@ DTSDEF void* rrr_bukarray_add_empty(bukarray_t* array, size_t sizeof_type, size_
         return ((char*)new_buk) + rrr_buk_value_offset(alignof_type);
     }
 
-    return rrr_bukarray_eleptr(array, new_index, sizeof_type, alignof_type);
+    return rrr_bukarray_eleptr(dts_debug_only(__FILE__, __LINE__,) array, new_index, sizeof_type, alignof_type);
 }
 
 DTSDEF bool rrr_bukarray_remove(bukarray_t* array)
@@ -482,9 +480,11 @@ DTSDEF void* rrr_listnode_valueptr(listnode_t* node, size_t alignof_type)
 typedef listnode_t* list_t;
 #define list(TYPE) list_t
 
-#define list_eleptr(LIST, TYPE, INDEX)  ((TYPE*)rrr_list_eleptr(LIST, dts_alignof(TYPE), INDEX))
+#define list_eleptr(LIST, TYPE, INDEX)  ((TYPE*)rrr_list_eleptr(dts_debug_only(__FILE__, __LINE__,) LIST, dts_alignof(TYPE), INDEX))
 
 #define list_ele(LIST, TYPE, INDEX)     (*list_eleptr(LIST, TYPE, INDEX))
+
+#define list_ele_node(LIST, INDEX)      rrr_list_ele_node(dts_debug_only(__FILE__, __LINE__,) LIST, INDEX)
 
 #define list_insert_first(LIST, TYPE, VALUE) \
     do { \
@@ -536,13 +536,13 @@ DTSDEF listnode_t* list_first_node(list_t list)
     return list;
 }
 
-DTSDEF listnode_t* list_ele_node(list_t list, size_t index)
+DTSDEF listnode_t* rrr_list_ele_node(dts_debug_only(const char* file, int line,) list_t list, size_t index)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(list_size(list) <= index)
     {
-        fputs("Attempting to access an out of bounds element from a list!\n", stdout);
-        printf("More Info:\n\t(list size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", list_size(list), index);
+        fprintf(stdout, "ERROR in %s:%d: Out of bounds access of an array element!\n", file, line);
+        printf(" (array size: %"dts_PRIzu", accessed index: %"dts_PRIzu")\n", list_size(list), index);
         exit(EXIT_FAILURE);
     }
     #endif
@@ -579,13 +579,13 @@ DTSDEF list_t list_free(list_t l)
     return NULL;
 }
 
-DTSDEF void* rrr_list_eleptr(list_t l, size_t alignof_type, size_t index)
+DTSDEF void* rrr_list_eleptr(dts_debug_only(const char* file, int line,) list_t l, size_t alignof_type, size_t index)
 {
     #ifdef DTS_DEBUG_CHECKS
     if(list_size(l) <= index)
     {
-        fputs("Attempting to access an out of bounds element from a list!\n", stdout);
-        printf("More Info:\n\t(list size: %"dts_PRIzu", element index: %"dts_PRIzu")\n", list_size(l), index);
+        fprintf(stdout, "ERROR in %s:%d: Out of bounds access of an list element!\n", file, line);
+        printf(" (list size: %"dts_PRIzu", accessed index: %"dts_PRIzu")\n", list_size(l), index);
         exit(EXIT_FAILURE);
     }
     #endif
