@@ -276,29 +276,16 @@ DTSDEF void* rrr_dynarray_eleptr(dts_debug_only(const char* file, int line,) dyn
 
 #define DTS_ELEMENTS_PER_BUCKET ((size_t)512)
 
-typedef struct buk_t
-{
-    struct buk_t* next;
-    // manual alignment on allocation
-    // manual data size on allocation
-} buk_t;
-
-#define rrr_buk_value_offset(ALIGNOF_TYPE) (dts_align_sizeof(buk_t*, ALIGNOF_TYPE))
-#define rrr_buk_size(SIZEOF_TYPE, ALIGNOF_TYPE) (rrr_buk_value_offset(ALIGNOF_TYPE) + dts_align_size((SIZEOF_TYPE) * DTS_ELEMENTS_PER_BUCKET, dts_alignof(buk_t*)))
-
-#define buk_value_offset(TYPE) (rrr_buk_value_offset(dts_alignof(TYPE)))
-#define buk_size(TYPE) (rrr_buk_size(sizeof(TYPE), dts_alignof(TYPE)))
-
 typedef struct BUKARRAY_STRUCT
 {
     size_t bucket_amount;
     size_t size;
-    buk_t* first_buk;
+    char** buckets;
 } bukarray_t;
 
 #define bukarray(TYPE) bukarray_t
 
-#define BUKARRAY_EMPTY_INIT(TYPE) { .bucket_amount = 0, .size = 0, .first_buk = NULL }
+#define BUKARRAY_EMPTY_INIT(TYPE) { .bucket_amount = 0, .size = 0, .buckets = NULL }
 
 #define BUKARRAY_EMPTY(TYPE) ((bukarray_t)BUKARRAY_EMPTY_INIT(TYPE))
 
@@ -329,20 +316,15 @@ DTSDEF size_t bukarray_size(bukarray_t* array)
 
 DTSDEF bool bukarray_is_empty(bukarray_t* array)
 {
-    return array->bucket_amount == 0 && array->size == 0 && array->first_buk == NULL;
+    return array->bucket_amount == 0 && array->size == 0 && array->buckets == NULL;
 }
 
 DTSDEF void bukarray_free(bukarray_t* array)
 {
-    buk_t* current_buk = array->first_buk; 
+    for (size_t i = 0; i < array->bucket_amount; i++)
+        free(array->buckets[i]);
 
-    while(current_buk != NULL)
-    {
-        buk_t* next_buk = current_buk->next;
-        free(current_buk);
-        current_buk = next_buk;
-    }
-
+    free(array->buckets);
     *array = BUKARRAY_EMPTY();
 }
 
@@ -354,17 +336,10 @@ DTSDEF bukarray_t rrr_bukarray_new(size_t sizeof_type, size_t alignof_type, size
     bukarray_t array;
     array.bucket_amount = (initial_capacity - 1) / DTS_ELEMENTS_PER_BUCKET + 1;
     array.size = 0;
-    array.first_buk = malloc(rrr_buk_size(sizeof_type, alignof_type));
+    array.buckets = malloc(sizeof(char*) * array.bucket_amount);
 
-    buk_t* current_buk = array.first_buk;
-
-    for (size_t i = 0; i < bukarray_bucket_amount(&array) - 1; i++)
-    {
-        current_buk->next = malloc(rrr_buk_size(sizeof_type, alignof_type));
-        current_buk = current_buk->next;
-    }
-
-    current_buk->next = NULL;
+    for (size_t i = 0; i < bukarray_bucket_amount(&array); i++)
+        array.buckets[i] = malloc(sizeof_type * DTS_ELEMENTS_PER_BUCKET);
     
     return array;
 }
@@ -383,12 +358,7 @@ DTSDEF void* rrr_bukarray_eleptr(dts_debug_only(const char* file, int line,) buk
     size_t bucket_index = index / DTS_ELEMENTS_PER_BUCKET;
     size_t internal_index = index % DTS_ELEMENTS_PER_BUCKET;
 
-    buk_t* target_bucket = array->first_buk;
-
-    for (size_t i = 0; i < bucket_index; i++)
-        target_bucket = target_bucket->next;
-
-    return ((char*)target_bucket) + rrr_buk_value_offset(alignof_type) + (internal_index * sizeof_type);
+    return &(array->buckets[bucket_index])[sizeof_type * internal_index];
 }
 
 DTSDEF void* rrr_bukarray_add_empty(bukarray_t* array, size_t sizeof_type, size_t alignof_type)
@@ -401,24 +371,11 @@ DTSDEF void* rrr_bukarray_add_empty(bukarray_t* array, size_t sizeof_type, size_
     {
         array->bucket_amount++;
 
-        buk_t* new_buk = malloc(rrr_buk_size(sizeof_type, alignof_type));
-        new_buk->next = NULL;
+        char* new_bucket = malloc(sizeof_type * DTS_ELEMENTS_PER_BUCKET);
+        array->buckets = realloc(array->buckets, sizeof(char*) * array->bucket_amount);
+        array->buckets[array->bucket_amount-1] = new_bucket;
 
-        if(bukarray_bucket_amount(array) == 1)
-        {
-            array->first_buk = new_buk;
-        }
-        else
-        {    
-            buk_t* last_buk = array->first_buk;
-
-            for (size_t i = 0; i < bukarray_bucket_amount(array) - 2; i++)
-                last_buk = last_buk->next;
-
-            last_buk->next = new_buk;
-        }
-
-        return ((char*)new_buk) + rrr_buk_value_offset(alignof_type);
+        return new_bucket;
     }
 
     return rrr_bukarray_eleptr(dts_debug_only(__FILE__, __LINE__,) array, new_index, sizeof_type, alignof_type);

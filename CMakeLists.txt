@@ -29,8 +29,6 @@ add_test("Array Heap" test_array1)
 add_test("Array Alias" test_array2)
 add_test("Dynarray" test_dynarray1)
 add_test("Bukarray" test_bukarray1)
-add_test("Manual Bucket Value Offset" test_buk_value_offset)
-add_test("Manual sizeof bucket" test_buk_sizeof)
 add_test("Manual sizeof listnode" test_listnode_sizeof)
 add_test("Manual sizeof struct" test_struct_sizeof)
 
